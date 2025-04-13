@@ -8,6 +8,8 @@ new Q5();
 
 let hintButton = new Sprite(10000, 10000, 100, 50, 'static');
 hintButton.text = 'HINT';
+let slowmoButton = new Sprite(10000, 10000, 100, 50, 'static');
+slowmoButton.text = 'PRACTICE';
 
 function setup() {
 	// new Canvas('16:9'); // create the largest 16:9 canvas possible
@@ -105,14 +107,15 @@ function createLevel() {
 		start = [400, 100];
 		goals.coords.push([900, 600]);
 		if (level == 7) {
-			new obstacles.Sprite(650, 600, 26, 400);
-		} else if (level == 8) {
 			new obstacles.Sprite(650, 500, 26, 400);
+		} else if (level == 8) {
+			new obstacles.Sprite(650, 400, 26, 400);
 		} else if (level == 9) {
-			new obstacles.Sprite(650, 400, 26, 400);
-		} else if (level == 10) {
-			new obstacles.Sprite(650, 400, 26, 400);
 			new obstacles.Sprite(787, 200, 300, 26);
+			new obstacles.Sprite(650, 600, 26, 500);
+		} else if (level == 10) {
+			new obstacles.Sprite(787, 200, 300, 26);
+			new obstacles.Sprite(650, 600, 26, 800);
 		}
 	} else if (level <= 13) {
 		start = [400, 100];
@@ -143,6 +146,10 @@ function createLevel() {
 			new obstacles.Sprite(400, 100, 26, 600);
 			new obstacles.Sprite(800, 600, 26, 600);
 		}
+	} else if (level == 17) {
+		start = [250, 64];
+		new obstacles.Sprite(395, 250, 26, 400);
+		new obstacles.Sprite(600, 400, 26, 400);
 	}
 
 	players.x = () => start[0];
@@ -151,7 +158,7 @@ function createLevel() {
 	resetLevel();
 }
 
-let level = 0;
+let level = 17;
 
 let deaths = -1;
 function resetLevel() {
@@ -168,12 +175,17 @@ function resetLevel() {
 
 	startTimer = 200;
 	deaths++;
+	background(secondary);
 }
 
 function update() {
-	background(secondary);
+	if (!slowmoEnabled) background(secondary);
+	else background(20, 20);
 
-	if (hint()) return;
+	if (deaths >= 1) {
+		if (level <= 5) hint();
+		else slowmo();
+	}
 
 	fill(primary);
 	stroke(primary);
@@ -224,20 +236,83 @@ function update() {
 	if (kb.presses('enter')) {
 		win();
 	}
+	textSize(128);
+	fill(255, 128);
+	strokeWeight(0);
+	text(level, 0, 108);
+	strokeWeight(1);
 }
+
+let slowmoEnabled = false;
+
+function slowmo() {
+	slowmoButton.x = 1200;
+	slowmoButton.y = 700;
+
+	if (slowmoButton.mouse.presses()) {
+		if (slowmoEnabled) {
+			slowmoButton.text = 'PRACTICE';
+			slowmoEnabled = false;
+			resetLevel();
+		} else {
+			slowmoButton.text = 'PRACTICE_OFF';
+			slowmoEnabled = true;
+		}
+	}
+	if (slowmoEnabled) world.timeScale = 0.5;
+	else world.timeScale = 1;
+}
+
 let showHint = false;
+
 function hint() {
-	if (deaths >= 1 && showHint == false) {
+	if (!showHint) {
 		hintButton.x = 1200;
 		hintButton.y = 700;
 		if (hintButton.mouse.presses()) {
 			showHint = true;
 			hintButton.x = 10000;
 			hintButton.y = 10000;
-			return true;
-		}
+		} else return;
 	}
-	if (showHint == true && level == 5) {
+
+	if (level == 0) {
+		ctx.setLineDash([5, 15]);
+		stroke('lime');
+		line(580, 200, 690, 630);
+		ctx.setLineDash([]);
+	}
+	if (level == 1) {
+		ctx.setLineDash([5, 15]);
+		stroke('lime');
+		line(580, 200, 580, 600);
+		line(580, 600, 720, 600);
+		ctx.setLineDash([]);
+	}
+	if (level == 2) {
+		ctx.setLineDash([5, 15]);
+		stroke('lime');
+		line(380, 260, 870, 310);
+		line(380, 270, 870, 320);
+		ctx.setLineDash([]);
+	}
+	if (level == 3) {
+		ctx.setLineDash([5, 15]);
+		stroke('lime');
+		line(180, 190, 220, 250);
+		line(220, 250, 800, 270);
+		line(220, 255, 800, 275);
+		line(800, 275, 1060, 510);
+		ctx.setLineDash([]);
+	}
+	if (level == 4) {
+		ctx.setLineDash([5, 15]);
+		stroke('lime');
+		line(190, 160, 530, 540);
+		line(530, 540, 1060, 510);
+		ctx.setLineDash([]);
+	}
+	if (level == 5) {
 		ctx.setLineDash([5, 15]);
 		stroke('lime');
 		line(560, 570, 720, 570);
@@ -251,8 +326,14 @@ function win() {
 	nodes.removeAll();
 	goals.removeAll();
 	obstacles.removeAll();
-
+	hintButton.x = 10000;
+	if (slowmoEnabled) {
+		resetLevel();
+		level--;
+	}
 	level++;
 	createLevel();
 	showHint = false;
+	slowmoEnabled = false;
+	slowmoButton.text = 'PRACTICE';
 }
