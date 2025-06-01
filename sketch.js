@@ -22,14 +22,20 @@ function setup() {
 	primary = color(200);
 	secondary = color(20);
 
+	platforms = new Group();
+	platforms.physics = KIN;
+	platforms.vel.y = -1;
+	platforms.w = 40;
+	platforms.h = 20;
+
 	obstacles = new Group();
-	obstacles.collider = 'static';
+	obstacles.physics = STATIC;
 	obstacles.color = primary;
 	obstacles.w = 26;
 	obstacles.h = 86;
 
 	goals = new Group();
-	goals.collider = 'static';
+	goals.physics = STATIC;
 	goals.color = 'cyan';
 	goals.diameter = 20;
 	goals.draw = function () {
@@ -39,13 +45,13 @@ function setup() {
 	};
 
 	lines = new Group();
-	lines.collider = 'static';
+	lines.physics = STATIC;
 	lines.friction = 0;
 	lines.life = 200;
 	lines.color = primary;
 
 	nodes = new Group();
-	nodes.collider = 'none';
+	nodes.physics = NONE;
 	nodes.diameter = 8;
 	nodes.life = 200;
 	nodes.color = primary;
@@ -57,7 +63,7 @@ function setup() {
 	};
 
 	players = new Group();
-	players.collider = 'static';
+	players.physics = 'static';
 	players.diameter = 20;
 	players.color = 'white';
 	players.draw = function () {
@@ -146,10 +152,37 @@ function createLevel() {
 			new obstacles.Sprite(400, 100, 26, 600);
 			new obstacles.Sprite(800, 600, 26, 600);
 		}
-	} else if (level == 17) {
+	} else if (level <= 18) {
 		start = [250, 64];
-		new obstacles.Sprite(395, 250, 26, 400);
-		new obstacles.Sprite(600, 400, 26, 400);
+		new obstacles.Sprite(395, 200, 26, 600);
+		new obstacles.Sprite(800, 500, 26, 600);
+		let plat0 = new platforms.Sprite(250, 400, 200, 26);
+		plat0.rotation = -10;
+		new platforms.Sprite(600, 1100, 200, 26).rotation = 10;
+		goals.coords.push([1050, 600]);
+		if (level == 18) {
+			plat0.vel.y = 1;
+			plat0.y = -10;
+		}
+	} else if (level == 19) {
+		start = [250, 50];
+		goals.coords.push([1050, 600]);
+		new platforms.Sprite(300, 300, 100, 10);
+	} else if (level == 100000) {
+		start = [250, 50];
+		goals.coords.push([1050, 600]);
+		for (let i = 0; i < 20; i++) {
+			for (let j = 0; j < 11; j++) {
+				let stagger = 0;
+				if (i % 2 == 1) stagger = 40;
+				new platforms.Sprite(i * 80, j * 80 + stagger);
+			}
+		}
+	}
+
+	for (let plat of platforms) {
+		plat.initY = plat.y;
+		plat.initX = plat.x;
 	}
 
 	players.x = () => start[0];
@@ -171,6 +204,11 @@ function resetLevel() {
 
 	for (let coord of goals.coords) {
 		new goals.Sprite(coord[0], coord[1]);
+	}
+
+	for (let plat of platforms) {
+		plat.y = plat.initY;
+		plat.x = plat.initX;
 	}
 
 	startTimer = 200;
@@ -195,10 +233,10 @@ function update() {
 	if (startTimer > 0) {
 		player.color = -startTimer + 256;
 	} else {
-		player.collider = 'dynamic';
+		player.physics = 'dynamic';
 	}
 
-	if (player.y - player.h * 2 > height) {
+	if (player.y - player.h * 2 > height || player.y + player.h * 2 < 0) {
 		resetLevel();
 	}
 
@@ -236,6 +274,12 @@ function update() {
 	if (kb.presses('enter')) {
 		win();
 	}
+
+	for (let plat of platforms) {
+		if (plat.y < -80) {
+			plat.y = 800;
+		}
+	}
 	textSize(128);
 	fill(255, 128);
 	strokeWeight(0);
@@ -247,7 +291,7 @@ let slowmoEnabled = false;
 
 function slowmo() {
 	slowmoButton.x = 1200;
-	slowmoButton.y = 700;
+	slowmoButton.y = 30;
 
 	if (slowmoButton.mouse.presses()) {
 		if (slowmoEnabled) {
@@ -326,6 +370,7 @@ function win() {
 	nodes.removeAll();
 	goals.removeAll();
 	obstacles.removeAll();
+	platforms.removeAll();
 	hintButton.x = 10000;
 	if (slowmoEnabled) {
 		resetLevel();
