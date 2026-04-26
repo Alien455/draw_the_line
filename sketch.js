@@ -1,71 +1,188 @@
-let q = await Q5.WebGPU();
+// new Canvas('16:9'); // create the largest 16:9 canvas possible
+const S = 0.5;
+await createCanvas(1280 * S, 720 * S);
+displayMode(MAXED, PIXELATED);
+// 2560x1440
+
 let shouldConnectLines = true;
 
 let startGame = false;
 
 let time = 0;
 
+let levelFrameCount = 0;
+let playerPositions = [];
+
 loadFont('/space_age.ttf');
 
-let hintButton = new Sprite(10000, 10000, 100, 50, 'static');
-hintButton.text = 'HINT';
-hintButton.textSize = 24;
-hintButton.fill = '#4170b8';
-let slowmoButton = new Sprite(10000, 10000, 200, 50, 'static');
-slowmoButton.text = 'PRACTICE';
-slowmoButton.fill = '#4170b8';
-slowmoButton.textSize = 24;
-let titleButton = new Sprite(10000, 100000, 130, 50, 'static');
-titleButton.text = 'Click to Play!';
+let ui = new Group();
+ui.addAnis(await load('ui/buttons.png'), {
+	button0: { width: 128, height: 48, frames: 3 },
+	button1: { y: 48, width: 64, height: 32, frames: 3 }
+});
+
+let titleButton = new ui.Sprite(0, height / 2 - 40, 64, 32, 'static');
+titleButton.changeAni('button0');
+titleButton.ani.offset.y = 4;
+titleButton.text = 'Play';
+titleButton.textSize = 35;
 titleButton.textFill = 'cyan';
 titleButton.fill = '#1b3dc4';
 
-// new Canvas('16:9'); // create the largest 16:9 canvas possible
-new Canvas(1280, 720);
-displayMode(CENTER);
-// 2560x1440
+let hintButton = new ui.Sprite(10000, 10000, 53, 23, 'static');
+hintButton.changeAni('button1');
+//hintButton.ani.offset.y = 4;
+hintButton.text = 'HINT';
+hintButton.textSize = 14;
+hintButton.overlap(allSprites);
 
-world.gravity.y = 10;
+let slowmoButton = new ui.Sprite(10000, 10000, 200, 23, 'static');
+slowmoButton.changeAni('button1');
+slowmoButton.text = 'PRACTICE';
+slowmoButton.fill = '#4170b8';
+slowmoButton.textSize = 24 * S;
+
+let hitSound = loadSound('sound/hit.ogg');
+hitSound.volume = 0.1;
+
+let fallSound = loadSound('sound/Fall0.ogg');
+fallSound.volume = 0.1;
+
+let goalSound = loadSound('sound/Goal.ogg');
+goalSound.volume = 0.2;
+
+world.gravity.y = 10 * S;
 
 let primary = color(0.7);
 let secondary = color(0.1);
 
+let magic = [];
+for (let i = 0; i < 80; i++) {
+	let num = i + 1;
+	if (num < 10) num = '0' + num;
+	magic.push(loadAni('magic/' + num + '.png', { width: 64, height: 64, frames: 16 }));
+}
+
+let spells = new Group();
+spells.anis.w = 64;
+spells.anis.h = 64;
+spells.addAnis('spells/spells0.png', {
+	spell0: { row: 0, frames: 17 },
+	spell1: { row: 1, frames: 15 },
+	spell2: { row: 2, frames: 18 }
+});
+spells.addAnis('spells/spells1.png', {
+	spell3: { row: 0, frames: 7 },
+	spell4: { row: 1, frames: 7 },
+	spell5: { row: 2, frames: 8 },
+	spell6: { row: 3, frames: 9 },
+	spell7: { row: 4, frames: 9 },
+	spell8: { row: 5, frames: 9 },
+	spell9: { row: 6, frames: 9 },
+	spell10: { row: 7, frames: 10 },
+	spell11: { row: 8, frames: 11 }
+});
+spells.addAnis('spells/spells2.png', {
+	spell12: { row: 0, frames: 11 }
+});
+spells.addAnis('spells/spells3.png', {
+	spell13: { row: 0, frames: 12, width: 48, height: 48 },
+	spell14: { row: 1, frames: 12, width: 48, height: 48 },
+	spell15: { row: 2, frames: 15, width: 48, height: 48 },
+	spell16: { row: 3, frames: 15, width: 48, height: 48 },
+	spell17: { row: 4, frames: 15, width: 48, height: 48 },
+	spell18: { row: 5, frames: 15, width: 48, height: 48 },
+	spell19: { row: 6, frames: 12, width: 48, height: 48 },
+	spell20: { row: 7, frames: 11, width: 48, height: 48 },
+	spell21: { row: 8, frames: 12, width: 48, height: 48 }
+});
+
+let effects = new Group();
+effects.anis.w = 96;
+effects.anis.h = 96;
+effects.physics = NONE;
+effects.addAnis('fx/GoalEffect.png', {
+	warp2: { row: 0, frames: 10 }
+});
+
 let platforms = new Group();
 platforms.physics = KIN;
 platforms.color = color('#00ff26');
-platforms.vel.y = -1;
-platforms.w = 40;
-platforms.h = 20;
+platforms.vel.y = -1 * S;
+platforms.w = 40 * S;
+platforms.h = 20 * S;
 
 let obstacles = new Group();
 obstacles.physics = STATIC;
 obstacles.color = primary;
-obstacles.w = 26;
-obstacles.h = 86;
+obstacles.w = 16 * S;
+obstacles.h = 64 * S;
+obstacles.addAnis('objects/smallObstacle.png', {
+	middle: { row: 1, width: 16, height: 64, frames: 8 },
+	end: { row: 7, width: 24, height: 64, frames: 8 }
+});
+obstacles.draw = function () {
+	pushMatrix();
+	let length;
+	if (this.w < this.h) {
+		rotate(90);
+		length = this.h;
+	} else {
+		length = this.w;
+	}
+
+	let amount = length / 16;
+
+	let mid = (amount - 1) / 2;
+
+	let curFrame = obstacles.anis.middle.frame;
+
+	for (let i = -mid; i <= mid; i++) {
+		obstacles.anis.middle.frame = curFrame;
+		animation(obstacles.anis.middle, 16 * i + 4, 0);
+	}
+
+	animation(obstacles.anis.end, -16 * (mid + 1) + 4, 0);
+	translate(16 * (mid + 1) - 4, 0);
+	rotate(180);
+	animation(obstacles.anis.end, 0, 0);
+
+	if (frameCount % 8 == 0) {
+		obstacles.anis.middle.nextFrame();
+	}
+
+	popMatrix();
+};
 
 let goals = new Group();
 goals.physics = STATIC;
-goals.diameter = 26;
-goals.draw = function () {
-	//shadow('cyan');
-	//shadowBox(0, 0, this.diameter);
+goals.diameter = 16 * S;
+goals.layer = 1;
+goals.addAni('objects/Goal.png', {
+	width: 48,
+	height: 48,
+	frames: 40
+});
+// goals.draw = function () {
+// 	//shadow('cyan');
+// 	//shadowBox(0, 0, this.diameter);
 
-	//noShadow();
+// 	//noShadow();
 
-	for (let i = 0; i < 60; i++) {
-		fill(0, i * 4, i * 5, i * 5);
-		for (let j = 0; j < 3; j++) {
-			let a = frameCount + i * 2 + j * 120;
-			let size = 13;
-			circle(cos(a) * size, sin(a) * size, 2);
-		}
-	}
+// 	for (let i = 0; i < 60; i++) {
+// 		fill(0, i * 4, i * 5, i * 5);
+// 		for (let j = 0; j < 3; j++) {
+// 			let a = frameCount + i * 2 + j * 120;
+// 			let size = 13;
+// 			circle(cos(a) * size, sin(a) * size, 2);
+// 		}
+// 	}
 
-	// shadow('cyan');
-	// shadowBox(0, 0, this.diameter);
-	fill(0, 0, 0, 255);
-	circle(0, 0, this.diameter);
-};
+// 	// shadow('cyan');
+// 	// shadowBox(0, 0, this.diameter);
+// 	fill(0, 0, 0, 255);
+// 	circle(0, 0, this.diameter);
+// };
 
 let lines = new Group();
 lines.physics = STATIC;
@@ -75,7 +192,7 @@ lines.color = primary;
 
 let nodes = new Group();
 nodes.physics = NONE;
-nodes.diameter = 8;
+nodes.diameter = 8 * S;
 nodes.life = 200;
 nodes.color = primary;
 nodes.draw = function () {
@@ -87,20 +204,36 @@ nodes.draw = function () {
 
 let players = new Group();
 players.physics = 'static';
-players.diameter = 20;
+players.diameter = 24 * S;
 players.color = 'white';
-players.draw = function () {
-	// shadow('white');
-	// shadowBox(0, 0, this.diameter);
-	ellipse(0, 0, this.diameter);
-};
+players.layer = 2;
+players.addAni('objects/Player.png', {
+	width: 24,
+	height: 24,
+	frames: 24
+});
 
-players.collide(obstacles, resetLevel);
+let cosmicClones = new Group();
+cosmicClones.physics = KINEMATIC;
+cosmicClones.diameter = 20 * S;
+cosmicClones.color = '#ce0df5ff';
 
-players.overlap(goals, (player, goal) => {
+players.collide(obstacles, lose);
+players.collide(cosmicClones, resetLevel);
+players.overlap(goals, async (player, goal) => {
+	new effects.Sprite(goal.x, goal.y);
+	player.remove();
+	goalSound.play();
+	await delay(500);
+	effects.removeAll();
 	goal.remove();
 	if (!goals.length) win();
 });
+
+function lose() {
+	hitSound.play();
+	resetLevel();
+}
 
 //createLevel();
 let titleScreen = true;
@@ -111,12 +244,14 @@ function title() {
 	fill('cyan');
 	// shadow('black');
 	// shadowBox(0, 0, 20);
-	textSize(70);
+	textSize(71);
 	textAlign(CENTER, MIDDLE);
-	text('Draw The Line', 0, -100);
-	text('By: Ben', 0, 0);
-	titleButton.x = 0;
-	titleButton.y = 100;
+	text('Draw', 0, -160);
+	text('The', 0, -80);
+	text('Line', 0, 0);
+
+	textSize(35);
+	text('By: Ben', 0, 60);
 	if (titleButton.mouse.presses()) {
 		createLevel();
 		titleScreen = false;
@@ -125,27 +260,26 @@ function title() {
 		textAlign(LEFT);
 	}
 }
-
+let playerOrigin;
 function createLevel() {
-	let start;
 	goals.coords = [];
 
 	if (level <= 1) {
-		start = [-40, -160];
+		playerOrigin = [-40, -160];
 		goals.coords.push([60, 240]);
 		if (level == 1) {
-			new obstacles.Sprite(10, 40);
+			new obstacles.Sprite(10 * S, 40 * S, 26 * S, 86 * S);
 		}
 	} else if (level == 2) {
-		start = [-240, -110];
+		playerOrigin = [-240, -110];
 		goals.coords.push([210, -60]);
 	} else if (level == 3) {
-		start = [-440, -160];
+		playerOrigin = [-440, -160];
 		goals.coords.push([410, 140]);
-		new obstacles.Sprite(-340, -60, 800, 26);
+		new obstacles.Sprite(-340 * S, -60 * S, 800 * S, 26 * S);
 	} else if (level <= 6) {
-		start = [-440, -210];
-		new obstacles.Sprite(0, -160, 26, 600);
+		playerOrigin = [-440, -210];
+		new obstacles.Sprite(0 * S, -160 * S, 26 * S, 600 * S);
 		if (level == 4) {
 			goals.coords.push([410, 140]);
 		} else if (level == 5) {
@@ -154,68 +288,68 @@ function createLevel() {
 			goals.coords.push([410, 40]);
 		}
 	} else if (level <= 10) {
-		start = [-240, -260];
+		playerOrigin = [-240, -260];
 		goals.coords.push([260, 240]);
 		if (level == 7) {
-			new obstacles.Sprite(10, 140, 26, 400);
+			new obstacles.Sprite(10 * S, 140 * S, 26 * S, 400 * S);
 		} else if (level == 8) {
-			new obstacles.Sprite(10, 40, 26, 400);
+			new obstacles.Sprite(10 * S, 40 * S, 26 * S, 400 * S);
 		} else if (level == 9) {
-			new obstacles.Sprite(147, -160, 300, 26);
-			new obstacles.Sprite(10, 240, 26, 500);
+			new obstacles.Sprite(147 * S, -160 * S, 300 * S, 26 * S);
+			new obstacles.Sprite(10 * S, 240 * S, 26 * S, 500 * S);
 		} else if (level == 10) {
-			new obstacles.Sprite(147, -160, 300, 26);
-			new obstacles.Sprite(10, 240, 26, 800);
+			new obstacles.Sprite(225 * S, -160 * S, 300 * S, 26 * S);
+			new obstacles.Sprite(10 * S, 240 * S, 26 * S, 800 * S);
 		}
 	} else if (level <= 13) {
-		start = [-240, -260];
+		playerOrigin = [-240, -260];
 		goals.coords.push([-240, 240]);
 		goals.coords.push([460, 0]);
 
 		if (level == 11) {
-			new obstacles.Sprite(10, 40, 26, 200);
+			new obstacles.Sprite(10 * S, 40 * S, 26 * S, 200 * S);
 		} else if (level == 12) {
-			new obstacles.Sprite(10, 40, 26, 400);
+			new obstacles.Sprite(10 * S, 40 * S, 26 * S, 400 * S);
 		} else if (level == 13) {
-			new obstacles.Sprite(10, 40, 26, 500);
+			new obstacles.Sprite(10 * S, 40 * S, 26 * S, 500 * S);
 		}
 	} else if (level <= 16) {
 		if (level == 14) {
-			start = [-440, -210];
+			playerOrigin = [-440, -210];
 			goals.coords.push([410, 140]);
-			new obstacles.Sprite(-240, -260, 26, 500);
-			new obstacles.Sprite(160, 240, 26, 500);
+			new obstacles.Sprite(-240 * S, -260 * S, 26 * S, 500 * S);
+			new obstacles.Sprite(160 * S, 240 * S, 26 * S, 500 * S);
 		} else if (level == 15) {
-			start = [-440, -260];
+			playerOrigin = [-440, -260];
 			goals.coords.push([410, 240]);
-			new obstacles.Sprite(-240, -260, 26, 550);
-			new obstacles.Sprite(160, 240, 26, 550);
+			new obstacles.Sprite(-240 * S, -260 * S, 26 * S, 550 * S);
+			new obstacles.Sprite(160 * S, 240 * S, 26 * S, 550 * S);
 		} else if (level == 16) {
-			start = [-440, -310];
-			goals.coords.push([410, 340]);
-			new obstacles.Sprite(-240, -260, 26, 600);
-			new obstacles.Sprite(160, 240, 26, 600);
+			playerOrigin = [-440, -310];
+			goals.coords.push([380, 310]);
+			new obstacles.Sprite(-240 * S, -260 * S, 26 * S, 600 * S);
+			new obstacles.Sprite(160 * S, 240 * S, 26 * S, 600 * S);
 		}
 	} else if (level <= 18) {
-		start = [-390, -296];
-		new obstacles.Sprite(-245, -160, 26, 600);
-		new obstacles.Sprite(160, 140, 26, 600);
-		let plat0 = new platforms.Sprite(-390, 40, 200, 26);
+		playerOrigin = [-390, -296];
+		new obstacles.Sprite(-245 * S, -160 * S, 26 * S, 600 * S);
+		new obstacles.Sprite(160 * S, 140 * S, 26 * S, 600 * S);
+		let plat0 = new platforms.Sprite(-390 * S, 40 * S, 200 * S, 26 * S);
 		plat0.rotation = -10;
-		new platforms.Sprite(-40, 740, 200, 26).rotation = 10;
+		new platforms.Sprite(-40 * S, 740 * S, 200 * S, 26 * S).rotation = 10;
 		goals.coords.push([410, 240]);
 		if (level == 18) {
-			plat0.vel.y = 1;
-			plat0.y = -370;
+			plat0.vel.y = 1 * S;
+			plat0.y = -370 * S;
 		}
 	} else if (level == 19) {
-		start = [-390, -310];
+		playerOrigin = [-390, -310];
 		goals.coords.push([410, 240]);
 		for (let i = 0; i < 20; i++) {
 			for (let j = 0; j < 11; j++) {
 				let stagger = 0;
 				if (i % 2 == 1) stagger = 40;
-				new platforms.Sprite(i * 80 - 640, j * 80 + stagger - 360);
+				new platforms.Sprite((i * 80 - 640) * S, (j * 80 + stagger - 360) * S);
 			}
 		}
 	}
@@ -225,13 +359,13 @@ function createLevel() {
 		plat.initX = plat.x;
 	}
 
-	players.x = () => start[0];
-	players.y = () => start[1];
+	players.x = () => playerOrigin[0] * S;
+	players.y = () => playerOrigin[1] * S;
 
 	resetLevel();
 }
 
-let level = 12;
+let level = 1;
 
 let deaths = -1;
 let startTimer = 0;
@@ -240,11 +374,13 @@ function resetLevel() {
 	lines.removeAll();
 	nodes.removeAll();
 	goals.removeAll();
-
+	levelFrameCount = 0;
 	player = new players.Sprite();
+	playerPositions = [];
+	cosmicClones.removeAll();
 
 	for (let coord of goals.coords) {
-		new goals.Sprite(coord[0], coord[1]);
+		let goal = new goals.Sprite(coord[0] * S, coord[1] * S);
 	}
 
 	for (let plat of platforms) {
@@ -257,19 +393,42 @@ function resetLevel() {
 	background(secondary);
 }
 let t = 0;
-q.update = function () {
-	let bg = color(secondary);
+Q5.update = function () {
+	let bg0, bg1, bg2, bg3;
 
-	if (level > 4 && level <= 8) {
-		bg = color('#1c3026');
+	if (level <= 4) {
+		bg0 = color('#980000');
+		bg1 = color('#e17272');
+		bg2 = color('#ffbaba');
+		bg3 = color('#b8180f50');
+	} else if (level > 4 && level <= 8) {
+		bg0 = color('#1c3026');
+		bg1 = color('#27d444');
+		bg2 = color('#698473');
+		bg3 = color('#4ffc5d50');
 	} else if (level > 8 && level <= 12) {
-		bg = color('#945050');
+		bg0 = color('#ffbb00');
+		bg1 = color('#ffec18');
+		bg2 = color('#f0e747');
+		bg3 = color('#ffdb2850');
 	} else if (level > 12 && level <= 16) {
-		bg = color('#98339850');
+		bg0 = color('#472b4750');
+		bg1 = color('#d85dd2');
+		bg2 = color('#c88eba');
+		bg3 = color('#fc595050');
 	}
-	if (slowmoEnabled) bg.alpha = 0.1;
+	if (slowmoEnabled) bg0.alpha = 0.1;
 
-	background(bg);
+	beginShape();
+	fill(bg0);
+	vertex(-halfWidth, -halfHeight);
+	fill(bg1);
+	vertex(halfWidth, -halfHeight);
+	fill(bg2);
+	vertex(halfWidth, halfHeight);
+	fill(bg3);
+	vertex(-halfWidth, halfHeight);
+	endShape(CLOSE);
 
 	//camera.x = 640;
 	//camera.y = 320;
@@ -301,40 +460,51 @@ q.update = function () {
 	// ctx.fillRect(0, 0, width, height);
 
 	t += 0.2;
-
+	push();
+	opacity(0.5);
+	let ani = spells.anis['spell' + (level % 22)];
+	let curFrame = ani.frame;
 	if (level <= 4) {
-		for (let i = 0; i < 20; i++) {
-			fill((50 + i) / 256, (50 + i) / 256, (100 + i) / 256, (30 + i) / 256);
-			strokeWeight(4);
-			stroke(0.2, 0.2, 0.5, 0.5);
-			ellipse(cos(t + i * 10) * 700, sin(t + i * 20) * 400, 140, 150);
+		for (let i = 0; i < 60; i++) {
+			if (level == 1) tint(i / 60, 1, i / 60);
+			else if (level == 4) tint(i / 60, i / 60, 1);
+			else tint(i / 60 + 0.5, 1, i / 60 + 0.5);
+
+			ani.frame = (curFrame + i) % ani.length;
+			animation(ani, cos(t + i * 10) * 350, sin(t + i * 20) * 200);
+
+			if (frameCount % 4 == 0) {
+				ani.nextFrame();
+			}
 		}
 	} else if (level > 4 && level <= 8) {
 		for (let i = 0; i < 40; i++) {
-			fill((70 + i) / 256, (35 + i) / 256, (150 + i) / 256, (30 + i) / 256);
+			// tint((70 + i) / 256, (35 + i) / 256, (150 + i) / 256, (30 + i) / 256);
+			ani.frame = (curFrame + i) % ani.length;
+			animation(ani, cos(t + i * 10) * 700, sin(t + i * 30) * 400);
+			if (frameCount % 16 == 0) {
+				ani.nextFrame();
+			}
 			strokeWeight(4);
 			stroke(0.2, 0.2, 0.5, 0.5);
-			square(cos(t + i * 10) * 700, sin(t + i * 30) * 400, 140, 150);
-			fill((90 + i) / 256, (200 + i) / 256, (50 + i) / 256, (70 + i) / 256);
+			// tint((90 + i) / 256, (200 + i) / 256, (50 + i) / 256, (70 + i) / 256);
 			line(cos(t + i * 10) * 700, sin(t + i * 30) * 400, 140, 150);
-			ellipse(cos(t + i * 10) * 700, sin(t + i * 30) * 400, 140, 150);
 		}
 	} else if (level > 8 && level <= 12) {
 		for (let i = 0; i < 70; i++) {
-			fill(
-				(30 + i * 1.3) / 256,
-				(noise(frameCount * 0.01, i) * 100 + i * 1.2) / 256,
-				(45 + i * 1.5) / 256,
-				(30 * i) / 256
-			);
-			strokeWeight(4);
-			stroke(0.2, 0.2, 0.5, 0.5);
-			ellipse(
-				cos(t + i * 20) * 700,
-				sin(t + i * 30) * 400,
-				noise(frameCount * 0.01, i) * 200,
-				noise(frameCount * 0.01, i) * 150
-			);
+			// tint(
+			// 	(30 + i * 1.3) / 256,
+			// 	(noise(frameCount * 0.01, i) * 100 + i * 1.2) / 256,
+			// 	(45 + i * 1.5) / 256,
+			// 	(30 * i) / 256
+			// );
+			translate(cos(t + i * 20) * 400, sin(t + i * 30) * 200);
+			scale(noise(frameCount * 0.01, i) * 3, noise(frameCount * 0.01, i) * 3);
+			animation(ani, 0, 0);
+			if (frameCount % 4 == 0) {
+				ani.nextFrame();
+			}
+			resetMatrix();
 		}
 		// let n = noise(frameCount * 0.004) * 500;
 		// fill('#ab4949');
@@ -347,18 +517,31 @@ q.update = function () {
 			fill('#00ff4050');
 			strokeWeight(10);
 			stroke('#00ff4070');
-			ellipse(nx, ny, 60, 40);
+			animation(ani, nx, ny);
+			if (frameCount % 4 == 0) {
+				ani.nextFrame();
+			}
 		}
-		for (let i = 0; i < 100; i++) {
-			let nx = noise(frameCount * 0.004 + i * 70) * 2300 - 1150;
-			let ny = noise(frameCount * 0.004 + 1000 + i * 70) * 2300 - 1150;
-			fill('#d76d6d50');
-			strokeWeight(10);
-			stroke('#e3c79470');
-			ellipse(nx, ny, 60, 40);
+	} else if (level > 16 && level <= 19) {
+		levelFrameCount++;
+		if (levelFrameCount > 180) {
+			playerPositions.push([player.x, player.y]);
+
+			if ((levelFrameCount - 60) % 120 == 0) {
+				new cosmicClones.Sprite();
+			}
+
+			for (let i = 0; i < cosmicClones.length; i++) {
+				let clone = cosmicClones[i];
+				let idx = levelFrameCount - 300 - i * 120;
+				log(idx);
+				clone.x = playerPositions[idx][0];
+				clone.y = playerPositions[idx][1];
+			}
 		}
 	}
-
+	opacity(1);
+	pop();
 	// 		let x = cos(t * cos(t * 3) + i * 20) * 400;
 	// 		let y = sin(t * cos(t * 3) + i * 30) * 500;
 	// 		fill('#fbff00');
@@ -373,9 +556,10 @@ q.update = function () {
 		return;
 	}
 
-	if (deaths >= 1) {
-		if (level <= 5) hint();
-		else slowmo();
+	if (level <= 5) {
+		if (deaths >= 1) hint();
+	} else {
+		if (deaths >= 5) slowmo();
 	}
 
 	fill(primary);
@@ -392,6 +576,7 @@ q.update = function () {
 	}
 
 	if (player.y - player.h * 2 > halfHeight || player.y + player.h * 2 < -halfHeight) {
+		fallSound.play();
 		resetLevel();
 	}
 
@@ -436,18 +621,18 @@ q.update = function () {
 			plat.y = 440;
 		}
 	}
-	textSize(128);
+	textSize(128 * S);
 	fill(255, 128);
 	strokeWeight(0);
-	text(level, -590, -240);
+	text(level, -590 * S, -240 * S);
 	strokeWeight(1);
 };
 
 let slowmoEnabled = false;
 
 function slowmo() {
-	slowmoButton.x = 540;
-	slowmoButton.y = 330;
+	slowmoButton.x = 540 * S;
+	slowmoButton.y = 330 * S;
 
 	if (slowmoButton.mouse.presses()) {
 		resetLevel();
@@ -467,48 +652,48 @@ let showHint = false;
 let art = 0;
 function hint() {
 	if (!showHint) {
-		hintButton.x = 580;
-		hintButton.y = 330;
+		hintButton.x = 580 * S;
+		hintButton.y = 330 * S;
 		if (hintButton.mouse.presses()) {
 			showHint = true;
-			hintButton.x = 10000;
-			hintButton.y = 10000;
+			hintButton.x = 10000 * S;
+			hintButton.y = 10000 * S;
 		} else return;
 	}
 
-	translate(-640, -360);
+	scale(0.5);
 
 	if (level == 0) {
 		stroke('lime');
-		line(580, 200, 690, 630);
+		line(-60, -160, 50, 270);
 	}
 	if (level == 1) {
 		stroke('lime');
-		line(580, 200, 580, 600);
-		line(580, 600, 720, 600);
+		line(-60, -160, -60, 240);
+		line(-60, 240, 80, 240);
 	}
 	if (level == 2) {
 		stroke('lime');
-		line(380, 260, 870, 310);
-		line(380, 270, 870, 320);
+		line(-260, -100, 230, -50);
+		line(-260, -90, 230, -40);
 	}
 	if (level == 3) {
 		stroke('lime');
-		line(180, 190, 220, 250);
-		line(220, 250, 800, 270);
-		line(220, 255, 800, 275);
-		line(800, 275, 1060, 510);
+		line(-460, -170, -420, -110);
+		line(-420, -110, 160, -90);
+		line(-420, -105, 160, -85);
+		line(160, -85, 420, 150);
 	}
 	if (level == 4) {
 		stroke('lime');
-		line(190, 160, 530, 540);
-		line(530, 540, 1060, 510);
+		line(-450, -200, -110, 180);
+		line(-110, 180, 420, 150);
 	}
 	if (level == 5) {
 		stroke('lime');
-		line(560, 570, 720, 570);
+		line(-80, 210, 80, 210);
 	}
-	translate(640, 360);
+	scale(2);
 }
 
 function win() {
@@ -518,12 +703,13 @@ function win() {
 	goals.removeAll();
 	obstacles.removeAll();
 	platforms.removeAll();
-	hintButton.x = 10000;
+	hintButton.x = 10000 * S;
 	if (slowmoEnabled) {
 		resetLevel();
 		level--;
 	}
 	level++;
+	deaths = 0;
 	createLevel();
 	showHint = false;
 	slowmoEnabled = false;
