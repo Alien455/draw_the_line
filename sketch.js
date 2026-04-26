@@ -56,13 +56,6 @@ world.gravity.y = 10 * S;
 let primary = color(0.7);
 let secondary = color(0.1);
 
-let magic = [];
-for (let i = 0; i < 80; i++) {
-	let num = i + 1;
-	if (num < 10) num = '0' + num;
-	magic.push(loadAni('magic/' + num + '.png', { width: 64, height: 64, frames: 16 }));
-}
-
 let spells = new Group();
 spells.anis.w = 64;
 spells.anis.h = 64;
