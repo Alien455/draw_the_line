@@ -1,17 +1,24 @@
 // new Canvas('16:9'); // create the largest 16:9 canvas possible
 const S = 0.5;
-await createCanvas(1280 * S, 720 * S);
+await Canvas(1280 * S, 720 * S);
 displayMode(MAXED, PIXELATED);
 // 2560x1440
 
 let shouldConnectLines = true;
-
 let startGame = false;
-
 let time = 0;
-
 let levelFrameCount = 0;
 let playerPositions = [];
+let playerOrigin;
+let titleScreen = true;
+let player;
+let level = 1;
+let deaths = -1;
+let levelTimer = 0;
+let t = 0;
+let showHint = false;
+let art = 0;
+let slowmoEnabled = false;
 
 loadFont('/space_age.ttf');
 
@@ -31,7 +38,6 @@ titleButton.fill = '#1b3dc4';
 
 let hintButton = new ui.Sprite(10000, 10000, 53, 23, 'static');
 hintButton.changeAni('button1');
-//hintButton.ani.offset.y = 4;
 hintButton.text = 'HINT';
 hintButton.textSize = 14;
 hintButton.overlap(allSprites);
@@ -42,19 +48,32 @@ slowmoButton.text = 'PRACTICE';
 slowmoButton.fill = '#4170b8';
 slowmoButton.textSize = 24 * S;
 
-let hitSound = loadSound('sound/hit.ogg');
-hitSound.volume = 0.1;
+let cosmicSound = loadSound('sound/CosmicClone.ogg');
+cosmicSound.volume = 0.2;
 
-let fallSound = loadSound('sound/Fall0.ogg');
-fallSound.volume = 0.1;
+let hitSounds = [];
+for (let i = 0; i < 5; i++) {
+	let hitSound = loadSound('sound/hit' + i + '.ogg');
+	hitSound.volume = 0.2;
+	hitSounds.push(hitSound);
+}
 
-let goalSound = loadSound('sound/Goal.ogg');
+let fallSounds = [];
+for (let i = 0; i < 5; i++) {
+	let fallSound = loadSound('sound/Fall' + i + '.ogg');
+	fallSound.volume = 0.1;
+	fallSounds.push(fallSound);
+}
+
+let goalCollectSound = loadSound('sound/Goal0.ogg');
+goalCollectSound.volume = 0.2;
+
+let goalSound = loadSound('sound/Goal1.ogg');
 goalSound.volume = 0.2;
 
 world.gravity.y = 10 * S;
 
 let primary = color(0.7);
-let secondary = color(0.1);
 
 let spells = new Group();
 spells.anis.w = 64;
@@ -156,26 +175,6 @@ goals.addAni('objects/Goal.png', {
 	height: 48,
 	frames: 40
 });
-// goals.draw = function () {
-// 	//shadow('cyan');
-// 	//shadowBox(0, 0, this.diameter);
-
-// 	//noShadow();
-
-// 	for (let i = 0; i < 60; i++) {
-// 		fill(0, i * 4, i * 5, i * 5);
-// 		for (let j = 0; j < 3; j++) {
-// 			let a = frameCount + i * 2 + j * 120;
-// 			let size = 13;
-// 			circle(cos(a) * size, sin(a) * size, 2);
-// 		}
-// 	}
-
-// 	// shadow('cyan');
-// 	// shadowBox(0, 0, this.diameter);
-// 	fill(0, 0, 0, 255);
-// 	circle(0, 0, this.diameter);
-// };
 
 let lines = new Group();
 lines.physics = STATIC;
@@ -189,16 +188,12 @@ nodes.diameter = 8 * S;
 nodes.life = 200;
 nodes.color = primary;
 nodes.draw = function () {
-	// draw a star
-	// shadow(primary);
-	// shadowBox(0, 0, this.diameter);
 	ellipse(0, 0, this.diameter);
 };
 
 let players = new Group();
 players.physics = 'static';
 players.diameter = 24 * S;
-players.color = 'white';
 players.layer = 2;
 players.addAni('objects/Player.png', {
 	width: 24,
@@ -212,31 +207,30 @@ cosmicClones.diameter = 20 * S;
 cosmicClones.color = '#ce0df5ff';
 
 players.collide(obstacles, lose);
-players.collide(cosmicClones, resetLevel);
+players.collide(cosmicClones, () => {
+	cosmicSound.play();
+	resetLevel();
+});
 players.overlap(goals, async (player, goal) => {
 	new effects.Sprite(goal.x, goal.y);
-	player.remove();
-	goalSound.play();
+	if (goals.length > 0) {
+		goalCollectSound.play();
+	} else {
+		goalSound.play();
+	}
 	await delay(500);
-	effects.removeAll();
-	goal.remove();
+	effects.deleteAll();
+	goal.delete();
 	if (!goals.length) win();
 });
 
 function lose() {
-	hitSound.play();
+	hitSounds[floor(random(hitSounds.length))].play();
 	resetLevel();
 }
 
-//createLevel();
-let titleScreen = true;
-
-let player;
-
 function title() {
 	fill('cyan');
-	// shadow('black');
-	// shadowBox(0, 0, 20);
 	textSize(71);
 	textAlign(CENTER, MIDDLE);
 	text('Draw', 0, -160);
@@ -248,12 +242,12 @@ function title() {
 	if (titleButton.mouse.presses()) {
 		createLevel();
 		titleScreen = false;
-		titleButton.remove();
+		titleButton.delete();
 		startGame = true;
 		textAlign(LEFT);
 	}
 }
-let playerOrigin;
+
 function createLevel() {
 	goals.coords = [];
 
@@ -345,6 +339,10 @@ function createLevel() {
 				new platforms.Sprite((i * 80 - 640) * S, (j * 80 + stagger - 360) * S);
 			}
 		}
+	} else if (level == 20) {
+		playerOrigin = [-390, -310];
+		goals.physics = KINEMATIC;
+		goals.coords.push([0, 0]);
 	}
 
 	for (let plat of platforms) {
@@ -358,22 +356,18 @@ function createLevel() {
 	resetLevel();
 }
 
-let level = 1;
-
-let deaths = -1;
-let startTimer = 0;
 function resetLevel() {
-	players.removeAll();
-	lines.removeAll();
-	nodes.removeAll();
-	goals.removeAll();
+	players.deleteAll();
+	lines.deleteAll();
+	nodes.deleteAll();
+	goals.deleteAll();
 	levelFrameCount = 0;
 	player = new players.Sprite();
 	playerPositions = [];
-	cosmicClones.removeAll();
+	cosmicClones.deleteAll();
 
 	for (let coord of goals.coords) {
-		let goal = new goals.Sprite(coord[0] * S, coord[1] * S);
+		new goals.Sprite(coord[0] * S, coord[1] * S);
 	}
 
 	for (let plat of platforms) {
@@ -381,11 +375,10 @@ function resetLevel() {
 		plat.x = plat.initX;
 	}
 
-	startTimer = 200;
+	levelTimer = 0;
 	deaths++;
-	background(secondary);
 }
-let t = 0;
+
 Q5.update = function () {
 	let bg0, bg1, bg2, bg3;
 
@@ -409,6 +402,11 @@ Q5.update = function () {
 		bg1 = color('#d85dd2');
 		bg2 = color('#c88eba');
 		bg3 = color('#fc595050');
+	} else if (level > 16) {
+		bg0 = color('#1b3dc450');
+		bg1 = color('#4170b8');
+		bg2 = color('#1b3dc4');
+		bg3 = color('#4170b850');
 	}
 	if (slowmoEnabled) bg0.alpha = 0.1;
 
@@ -423,34 +421,9 @@ Q5.update = function () {
 	vertex(-halfWidth, halfHeight);
 	endShape(CLOSE);
 
-	//camera.x = 640;
-	//camera.y = 320;
 	camera.on();
 
 	log(camera.x, camera.y);
-
-	// const gradient = ctx.createLinearGradient(0, 0, width, height);
-	// gradient.addColorStop(0, '#464646'); // Start color
-	// gradient.addColorStop((cos(frameCount * 0.1) + 1) / 2, '#1c1c1c');
-	// gradient.addColorStop(1, '#2e2e2e'); // End color
-
-	// const gradient2 = ctx.createLinearGradient(width, 0, 0, height);
-	// gradient2.addColorStop(0, '#46464662'); // Start color
-	// gradient2.addColorStop((cos(frameCount * 0.1) + 1) / 2, '#1c1c1c6e');
-	// gradient2.addColorStop(1, '#2e2e2e52'); // End color
-
-	// const gradient3 = ctx.createRadialGradient(0, 0, 1, 0, 0, width);
-	// gradient3.addColorStop(0, '#46464635'); // Start color
-	// gradient3.addColorStop((cos(frameCount * 0.1) + 1) / 2, '#1c1c1c5b');
-	// gradient3.addColorStop(1, '#2e2e2e33'); // End color
-
-	// // Use the gradient to fill a rectangle
-	// ctx.fillStyle = gradient;
-	// ctx.fillRect(0, 0, width, height);
-	// ctx.fillStyle = gradient2;
-	// ctx.fillRect(0, 0, width, height);
-	// ctx.fillStyle = gradient3;
-	// ctx.fillRect(0, 0, width, height);
 
 	t += 0.2;
 	push();
@@ -472,7 +445,6 @@ Q5.update = function () {
 		}
 	} else if (level > 4 && level <= 8) {
 		for (let i = 0; i < 40; i++) {
-			// tint((70 + i) / 256, (35 + i) / 256, (150 + i) / 256, (30 + i) / 256);
 			ani.frame = (curFrame + i) % ani.length;
 			animation(ani, cos(t + i * 10) * 700, sin(t + i * 30) * 400);
 			if (frameCount % 16 == 0) {
@@ -480,17 +452,10 @@ Q5.update = function () {
 			}
 			strokeWeight(4);
 			stroke(0.2, 0.2, 0.5, 0.5);
-			// tint((90 + i) / 256, (200 + i) / 256, (50 + i) / 256, (70 + i) / 256);
 			line(cos(t + i * 10) * 700, sin(t + i * 30) * 400, 140, 150);
 		}
 	} else if (level > 8 && level <= 12) {
 		for (let i = 0; i < 70; i++) {
-			// tint(
-			// 	(30 + i * 1.3) / 256,
-			// 	(noise(frameCount * 0.01, i) * 100 + i * 1.2) / 256,
-			// 	(45 + i * 1.5) / 256,
-			// 	(30 * i) / 256
-			// );
 			translate(cos(t + i * 20) * 400, sin(t + i * 30) * 200);
 			scale(noise(frameCount * 0.01, i) * 3, noise(frameCount * 0.01, i) * 3);
 			animation(ani, 0, 0);
@@ -499,10 +464,6 @@ Q5.update = function () {
 			}
 			resetMatrix();
 		}
-		// let n = noise(frameCount * 0.004) * 500;
-		// fill('#ab4949');
-		// strokeWeight(0);
-		// arc(n, n, 60, 60, sin(t * 30) * 20 + 20, cos(t * 30) * 20 - 20);
 	} else if (level > 12 && level <= 16) {
 		for (let i = 0; i < 100; i++) {
 			let nx = noise(frameCount * 0.004 + i * 50) * 2300 - 1150;
@@ -515,7 +476,7 @@ Q5.update = function () {
 				ani.nextFrame();
 			}
 		}
-	} else if (level > 16 && level <= 19) {
+	} else if (level > 16) {
 		levelFrameCount++;
 		if (levelFrameCount > 180) {
 			playerPositions.push([player.x, player.y]);
@@ -535,14 +496,6 @@ Q5.update = function () {
 	}
 	opacity(1);
 	pop();
-	// 		let x = cos(t * cos(t * 3) + i * 20) * 400;
-	// 		let y = sin(t * cos(t * 3) + i * 30) * 500;
-	// 		fill('#fbff00');
-	// 		strokeWeight(0);
-	// 		arc(x, y, 60, 60, sin(t * 30) * 20 + 20, cos(t * 30) * 20 - 20);
-	// 	}
-	// 	player.color = color('#877538');
-	// 	obstacles.color = 'blue';
 	if (titleScreen) {
 		title();
 
@@ -560,16 +513,16 @@ Q5.update = function () {
 	if (!startGame) {
 		return;
 	}
-	startTimer--;
+	levelTimer++;
 
-	if (startTimer > 0) {
-		player.color = -startTimer + 256;
+	if (levelTimer < 200) {
+		player.opacity = levelTimer / 200;
 	} else {
 		player.physics = 'dynamic';
 	}
 
 	if (player.y - player.h * 2 > halfHeight || player.y + player.h * 2 < -halfHeight) {
-		fallSound.play();
+		fallSounds[Math.floor(random(fallSounds.length))].play();
 		resetLevel();
 	}
 
@@ -602,16 +555,22 @@ Q5.update = function () {
 		shouldConnectLines = false;
 	}
 	if (kb.presses(' ')) {
-		lines.removeAll();
-		nodes.removeAll();
+		lines.deleteAll();
+		nodes.deleteAll();
 	}
 	if (kb.presses('enter')) {
 		win();
 	}
 
 	for (let plat of platforms) {
-		if (plat.y < -440) {
-			plat.y = 440;
+		if (plat.y < -220) {
+			plat.y = 220;
+		}
+	}
+
+	if (level == 20) {
+		for (let goal of goals) {
+			goal.moveTowards(player.x + (100 - levelTimer / 20), 100, 0.1);
 		}
 	}
 	textSize(128 * S);
@@ -620,8 +579,6 @@ Q5.update = function () {
 	text(level, -590 * S, -240 * S);
 	strokeWeight(1);
 };
-
-let slowmoEnabled = false;
 
 function slowmo() {
 	slowmoButton.x = 540 * S;
@@ -641,8 +598,6 @@ function slowmo() {
 	else world.timeScale = 1;
 }
 
-let showHint = false;
-let art = 0;
 function hint() {
 	if (!showHint) {
 		hintButton.x = 580 * S;
@@ -690,12 +645,12 @@ function hint() {
 }
 
 function win() {
-	players.removeAll();
-	lines.removeAll();
-	nodes.removeAll();
-	goals.removeAll();
-	obstacles.removeAll();
-	platforms.removeAll();
+	players.deleteAll();
+	lines.deleteAll();
+	nodes.deleteAll();
+	goals.deleteAll();
+	obstacles.deleteAll();
+	platforms.deleteAll();
 	hintButton.x = 10000 * S;
 	if (slowmoEnabled) {
 		resetLevel();
