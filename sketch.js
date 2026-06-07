@@ -20,6 +20,7 @@ let t = 0;
 let showHint = false;
 let art = 0;
 let slowmoEnabled = false;
+let warping = false;
 
 loadFont('ui/space_age.ttf');
 
@@ -218,9 +219,13 @@ players.collide(cosmicClones, () => {
 });
 players.overlap(goals, async (player, goal) => {
 	new effects.Sprite(goal.x, goal.y);
-	if (goals.length > 0) {
+	if (goals.length > 1) {
 		goalCollectSound.play();
 	} else {
+		warping = true;
+		player.speed = 0;
+		player.gravityScale = 0;
+		player.moveTo(goal.x, goal.y);
 		goalSound.play();
 	}
 	await delay(500);
@@ -255,7 +260,7 @@ function title() {
 
 function createLevel() {
 	goals.coords = [];
-
+	warping = false;
 	if (level <= 1) {
 		playerOrigin = [-40, -160];
 		goals.coords.push([60, 240]);
@@ -386,7 +391,7 @@ function resetLevel() {
 
 Q5.update = function () {
 	let bg0, bg1, bg2, bg3;
-
+	console.log(player.scale);
 	if (level <= 4) {
 		bg0 = color('#980000');
 		bg1 = color('#e17272');
@@ -579,6 +584,10 @@ Q5.update = function () {
 
 	if (level > 20) {
 		endScreen = true;
+	}
+
+	if (warping && player.scale > 0) {
+		player.scale -= t;
 	}
 
 	textSize(128 * S);
