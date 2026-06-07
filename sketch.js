@@ -11,6 +11,7 @@ let levelFrameCount = 0;
 let playerPositions = [];
 let playerOrigin;
 let titleScreen = true;
+let endScreen = false;
 let player;
 let level = 1;
 let deaths = -1;
@@ -20,7 +21,7 @@ let showHint = false;
 let art = 0;
 let slowmoEnabled = false;
 
-loadFont('/space_age.ttf');
+loadFont('ui/space_age.ttf');
 
 let ui = new Group();
 ui.addAnis(await load('ui/buttons.png'), {
@@ -28,7 +29,7 @@ ui.addAnis(await load('ui/buttons.png'), {
 	button1: { y: 48, width: 64, height: 32, frames: 3 }
 });
 
-let titleButton = new ui.Sprite(0, height / 2 - 40, 64, 32, 'static');
+let titleButton = new ui.Sprite(0, height / 2 - 40, 'static');
 titleButton.changeAni('button0');
 titleButton.ani.offset.y = 4;
 titleButton.text = 'Play';
@@ -41,6 +42,7 @@ hintButton.changeAni('button1');
 hintButton.text = 'HINT';
 hintButton.textSize = 14;
 hintButton.overlap(allSprites);
+hintButton.debug = true;
 
 let slowmoButton = new ui.Sprite(10000, 10000, 200, 23, 'static');
 slowmoButton.changeAni('button1');
@@ -476,7 +478,7 @@ Q5.update = function () {
 				ani.nextFrame();
 			}
 		}
-	} else if (level > 16) {
+	} else if (level > 16 && level <= 20) {
 		levelFrameCount++;
 		if (levelFrameCount > 180) {
 			playerPositions.push([player.x, player.y]);
@@ -499,6 +501,13 @@ Q5.update = function () {
 	if (titleScreen) {
 		title();
 
+		return;
+	}
+	if (endScreen) {
+		fill(255);
+		textSize(32);
+		text('Congratulations!\nYou beat the game!', -200, 0);
+		players.deleteAll();
 		return;
 	}
 
@@ -573,6 +582,11 @@ Q5.update = function () {
 			goal.moveTowards(player.x + (100 - levelTimer / 20), 100, 0.1);
 		}
 	}
+
+	if (level > 20) {
+		endScreen = true;
+	}
+
 	textSize(128 * S);
 	fill(255, 128);
 	strokeWeight(0);
