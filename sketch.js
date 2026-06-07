@@ -163,7 +163,7 @@ obstacles.draw = function () {
 	obstacles.anis.end.frame = curEndFrame;
 	animation(obstacles.anis.end, 0, 0);
 
-	if (frameCount % 8 == 0) {
+	if (frameCount % 4 == 0) {
 		obstacles.anis.middle.nextFrame();
 		obstacles.anis.end.nextFrame();
 	}
