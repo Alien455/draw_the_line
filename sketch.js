@@ -156,13 +156,16 @@ obstacles.draw = function () {
 		animation(obstacles.anis.middle, 16 * i + 4, 0);
 	}
 
+	let curEndFrame = obstacles.anis.end.frame;
 	animation(obstacles.anis.end, -16 * (mid + 1) + 4, 0);
 	translate(16 * (mid + 1) - 4, 0);
 	rotate(180);
+	obstacles.anis.end.frame = curEndFrame;
 	animation(obstacles.anis.end, 0, 0);
 
 	if (frameCount % 8 == 0) {
 		obstacles.anis.middle.nextFrame();
+		obstacles.anis.end.nextFrame();
 	}
 
 	popMatrix();
