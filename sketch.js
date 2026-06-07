@@ -391,7 +391,6 @@ function resetLevel() {
 
 Q5.update = function () {
 	let bg0, bg1, bg2, bg3;
-	console.log(player.scale);
 	if (level <= 4) {
 		bg0 = color('#980000');
 		bg1 = color('#e17272');
@@ -587,6 +586,7 @@ Q5.update = function () {
 	}
 
 	if (warping && player.scale > 0) {
+		console.log(player.scale);
 		player.scale -= t;
 	}
 
