@@ -586,8 +586,8 @@ Q5.update = function () {
 	}
 
 	if (warping && player.scale > 0) {
-		console.log(player.scale);
-		player.scale -= t;
+		//console.log(player.scale);
+		//player.scale -= t;
 	}
 
 	textSize(128 * S);
