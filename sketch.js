@@ -24,6 +24,7 @@ let slowmoEnabled = false;
 loadFont('ui/space_age.ttf');
 
 let ui = new Group();
+ui.anis.frameDelay = 16;
 ui.addAnis(await load('ui/buttons.png'), {
 	button0: { width: 128, height: 48, frames: 3 },
 	button1: { y: 48, width: 64, height: 32, frames: 3 }
@@ -42,9 +43,8 @@ hintButton.changeAni('button1');
 hintButton.text = 'HINT';
 hintButton.textSize = 14;
 hintButton.overlap(allSprites);
-hintButton.debug = true;
 
-let slowmoButton = new ui.Sprite(10000, 10000, 200, 23, 'static');
+let slowmoButton = new ui.Sprite(10000, 10000, 53, 23, 'static');
 slowmoButton.changeAni('button1');
 slowmoButton.text = 'PRACTICE';
 slowmoButton.fill = '#4170b8';
@@ -431,8 +431,9 @@ Q5.update = function () {
 	push();
 	opacity(0.5);
 	let ani = spells.anis['spell' + (level % 22)];
-	let curFrame = ani.frame;
+	let curFrame;
 	if (level <= 4) {
+		curFrame = floor(t) % ani.length;
 		for (let i = 0; i < 60; i++) {
 			if (level == 1) tint(i / 60, 1, i / 60);
 			else if (level == 4) tint(i / 60, i / 60, 1);
@@ -440,33 +441,26 @@ Q5.update = function () {
 
 			ani.frame = (curFrame + i) % ani.length;
 			animation(ani, cos(t + i * 10) * 350, sin(t + i * 20) * 200);
-
-			if (frameCount % 4 == 0) {
-				ani.nextFrame();
-			}
 		}
 	} else if (level > 4 && level <= 8) {
+		curFrame = floor(t) % ani.length;
 		for (let i = 0; i < 40; i++) {
 			ani.frame = (curFrame + i) % ani.length;
 			animation(ani, cos(t + i * 10) * 700, sin(t + i * 30) * 400);
-			if (frameCount % 16 == 0) {
-				ani.nextFrame();
-			}
 			strokeWeight(4);
 			stroke(0.2, 0.2, 0.5, 0.5);
 			line(cos(t + i * 10) * 700, sin(t + i * 30) * 400, 140, 150);
 		}
 	} else if (level > 8 && level <= 12) {
+		ani.frameDelay = 300;
 		for (let i = 0; i < 70; i++) {
 			translate(cos(t + i * 20) * 400, sin(t + i * 30) * 200);
 			scale(noise(frameCount * 0.01, i) * 3, noise(frameCount * 0.01, i) * 3);
 			animation(ani, 0, 0);
-			if (frameCount % 4 == 0) {
-				ani.nextFrame();
-			}
 			resetMatrix();
 		}
 	} else if (level > 12 && level <= 16) {
+		ani.frameDelay = 650;
 		for (let i = 0; i < 100; i++) {
 			let nx = noise(frameCount * 0.004 + i * 50) * 2300 - 1150;
 			let ny = noise(frameCount * 0.004 + 1000 + i * 50) * 2300 - 1150;
@@ -474,9 +468,6 @@ Q5.update = function () {
 			strokeWeight(10);
 			stroke('#00ff4070');
 			animation(ani, nx, ny);
-			if (frameCount % 4 == 0) {
-				ani.nextFrame();
-			}
 		}
 	} else if (level > 16 && level <= 20) {
 		levelFrameCount++;
