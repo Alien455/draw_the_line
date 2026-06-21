@@ -391,7 +391,6 @@ function resetLevel() {
 
 Q5.update = function () {
 	let bg0, bg1, bg2, bg3;
-	console.log(player.scale);
 	if (level <= 4) {
 		bg0 = color('#980000');
 		bg1 = color('#e17272');
@@ -432,8 +431,6 @@ Q5.update = function () {
 	endShape(CLOSE);
 
 	camera.on();
-
-	log(camera.x, camera.y);
 
 	t += 0.2;
 	push();
@@ -489,7 +486,6 @@ Q5.update = function () {
 			for (let i = 0; i < cosmicClones.length; i++) {
 				let clone = cosmicClones[i];
 				let idx = levelFrameCount - 300 - i * 120;
-				log(idx);
 				clone.x = playerPositions[idx][0];
 				clone.y = playerPositions[idx][1];
 			}
@@ -587,7 +583,7 @@ Q5.update = function () {
 	}
 
 	if (warping && player.scale > 0) {
-		player.scale -= t;
+		player.scale -= 0.02;
 	}
 
 	textSize(128 * S);
