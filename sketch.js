@@ -562,9 +562,6 @@ Q5.update = function () {
 		lines.deleteAll();
 		nodes.deleteAll();
 	}
-	if (kb.presses('enter')) {
-		win();
-	}
 
 	for (let plat of platforms) {
 		if (plat.y < -220) {
