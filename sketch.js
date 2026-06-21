@@ -583,7 +583,7 @@ Q5.update = function () {
 	}
 
 	if (warping && player.scale > 0) {
-		player.scale -= t;
+		player.scale -= 0.02;
 	}
 
 	textSize(128 * S);
